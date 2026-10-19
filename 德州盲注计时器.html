@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>德州扑克 · 盲注计时器</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#2f7bf6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="德州计时器">
+<link rel="apple-touch-icon" href="touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<style>
+:root{
+  --blue:#2f7bf6; --blue-deep:#1c5fd0; --blue-soft:#e8f1fe; --blue-mist:#f2f7ff;
+  --ink:#1e2a3a; --ink-soft:#5b6b7f;
+  --warn:#f59e0b; --danger:#ef4444;
+  --line:rgba(31,94,214,.12);
+  --card:rgba(255,255,255,.68);
+  --shadow:0 10px 34px rgba(31,94,214,.10);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(1000px 620px at 88% -12%, #dbeafe 0%, transparent 60%),
+    radial-gradient(820px 520px at -12% 112%, #dfebff 0%, transparent 55%),
+    linear-gradient(160deg,#f7fbff 0%,#eef5ff 100%);
+  min-height:100vh;
+}
+.bg-suits{position:fixed;inset:0;pointer-events:none;user-select:none;overflow:hidden;z-index:0}
+.bg-suits span{position:absolute;color:rgba(47,123,246,.05);font-size:230px;line-height:1;font-weight:700}
+.bg-suits span:nth-child(1){top:-60px;left:-40px}
+.bg-suits span:nth-child(2){top:30px;right:60px;color:rgba(239,68,68,.045)}
+.bg-suits span:nth-child(3){bottom:-70px;left:36%;color:rgba(16,185,129,.04)}
+.bg-suits span:nth-child(4){bottom:-40px;right:-30px}
+.glass{
+  background:var(--card);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(255,255,255,.85);
+  border-radius:22px;box-shadow:var(--shadow);
+}
+.hidden{display:none!important}
+.view{position:relative;z-index:1}
+button{font-family:inherit}
+svg{flex-shrink:0}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:10px 18px;border-radius:12px;cursor:pointer;
+  border:1px solid var(--line);background:#fff;color:var(--ink);
+  font-size:14px;transition:all .15s ease;user-select:none;
+}
+.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 14px rgba(31,94,214,.14)}
+.btn:active:not(:disabled){transform:translateY(0)}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn.primary{background:linear-gradient(135deg,#2f7bf6,#4a90f7);color:#fff;border:none}
+.btn.primary:hover:not(:disabled){box-shadow:0 8px 20px rgba(47,123,246,.35)}
+.btn.danger{color:#dc2626;border-color:#fecaca;background:#fff7f7}
+.btn.danger:hover:not(:disabled){box-shadow:0 5px 14px rgba(239,68,68,.16)}
+
+/* ============ 主界面 ============ */
+#viewMain{min-height:100vh;display:flex;flex-direction:column}
+.topbar{
+  max-width:1100px;width:100%;margin:0 auto;padding:18px 22px 0;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+}
+.brand{font-weight:800;font-size:17px;letter-spacing:.5px}
+.brand .suiticon{color:var(--blue)}
+.brand .suiticon.red{color:#ef4444}
+.topbar-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.btn.hands{font-size:13px;padding:8px 14px}
+.phase-badge{
+  background:linear-gradient(135deg,#2f7bf6,#4a90f7);color:#fff;
+  padding:7px 16px;border-radius:999px;font-size:13.5px;font-weight:700;
+  box-shadow:0 4px 14px rgba(47,123,246,.30);letter-spacing:1px;
+}
+.phase-badge b{font-size:16px}
+.layout{flex:1;max-width:1100px;width:100%;margin:0 auto;padding:16px 22px 8px;display:flex;gap:18px;align-items:stretch}
+aside#stageList{
+  width:250px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;
+  padding:16px 14px;border-radius:22px;
+}
+.aside-title{font-size:12px;color:var(--ink-soft);letter-spacing:3px;text-align:center;margin-bottom:4px}
+.stg{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 12px;border-radius:12px;
+  background:rgba(255,255,255,.55);border:1px solid var(--line);
+  transition:all .2s ease;
+}
+.stg .no{
+  width:30px;height:30px;border-radius:9px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:13px;color:var(--blue-deep);background:var(--blue-soft);
+  font-variant-numeric:tabular-nums;
+}
+.stg .namebox{flex:1;min-width:0}
+.stg .t1{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stg .t1 .ph{color:var(--ink-soft);font-weight:600;margin-right:2px}
+.stg .t2{font-size:11.5px;color:var(--ink-soft);margin-top:1px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.stg .tag{font-size:10.5px;padding:2px 7px;border-radius:999px;background:rgba(47,123,246,.12);color:var(--blue-deep);white-space:nowrap;flex-shrink:0}
+.stg.done{opacity:.5}
+.stg.done .no{background:#e2e8f0;color:#64748b}
+.stg.done .no svg{width:13px;height:13px}
+.stg.cur{
+  background:linear-gradient(135deg,#2f7bf6,#5b9cf8);border-color:transparent;color:#fff;
+  box-shadow:0 8px 22px rgba(47,123,246,.38);
+}
+.stg.cur .no{background:rgba(255,255,255,.25);color:#fff}
+.stg.cur .t1 .ph{color:rgba(255,255,255,.85)}
+.stg.cur .t2{color:rgba(255,255,255,.9)}
+.stg.cur .tag{background:rgba(255,255,255,.22);color:#fff}
+
+main.center{flex:1;display:flex;flex-direction:column;align-items:center;padding:26px 30px 22px;min-height:480px}
+.pill-row{display:flex;gap:10px;align-items:center;min-height:34px;flex-wrap:wrap;justify-content:center}
+.stage-pill{
+  padding:6px 16px;border-radius:999px;font-size:14px;font-weight:700;
+  background:var(--blue-soft);color:var(--blue-deep);border:1px solid #cfe0ff;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.paused-pill{
+  padding:6px 16px;border-radius:999px;font-size:13px;font-weight:700;
+  background:#eef2f7;color:#64748b;border:1px solid #dde5ee;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.clock{
+  margin-top:14px;
+  font-size:clamp(70px,13vw,148px);font-weight:800;line-height:1;letter-spacing:3px;
+  font-variant-numeric:tabular-nums;color:var(--blue-deep);
+  transition:color .3s ease;
+}
+.clock.warn{color:var(--warn)}
+.clock.danger{color:var(--danger);animation:pulse 1s ease-in-out infinite}
+.clock.paused{color:#7b93b8}
+.clock.finished{font-size:clamp(40px,7vw,72px);letter-spacing:8px;color:var(--blue-deep);animation:none}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
+.blinds{display:flex;gap:16px;margin-top:20px}
+.blind{
+  min-width:186px;padding:13px 26px 15px;border-radius:18px;text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  transition:all .25s ease;
+}
+.blind .blabel{font-size:11.5px;letter-spacing:2px;color:var(--ink-soft)}
+.blind .bval{font-size:42px;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums}
+.blind.sb{background:var(--blue-soft);border:1px solid #cfe0ff}
+.blind.sb .bval{color:var(--blue-deep)}
+.blind.bb{background:#fff;border:1px solid var(--line)}
+.blind.bb .bval{color:var(--ink)}
+.blinds.dim{opacity:.45}
+.progress{width:min(520px,92%);height:8px;border-radius:999px;background:#e3edfb;margin-top:24px;overflow:hidden}
+.progress i{display:block;height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,#2f7bf6,#5b9cf8);transition:width .3s linear}
+.progress i.warn{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+.progress i.danger{background:linear-gradient(90deg,#ef4444,#f87171)}
+.controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:auto;padding-top:26px}
+.note{text-align:center;font-size:12px;color:#8aa2c4;padding:12px 16px 16px}
+.toast{
+  position:fixed;left:50%;top:26px;transform:translateX(-50%) translateY(-140%);
+  background:linear-gradient(135deg,#1c5fd0,#2f7bf6);color:#fff;
+  padding:12px 26px;border-radius:999px;font-size:14.5px;font-weight:700;
+  box-shadow:0 12px 32px rgba(31,94,214,.4);z-index:99;
+  transition:transform .35s cubic-bezier(.2,.9,.3,1.2);letter-spacing:.5px;
+  display:flex;align-items:center;gap:8px;white-space:nowrap;
+}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ============ 牌型大小弹窗 ============ */
+.modal-mask{
+  position:fixed;inset:0;z-index:50;
+  background:rgba(30,42,58,.35);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.modal{
+  width:min(760px,96vw);max-height:88vh;overflow-y:auto;
+  border-radius:22px;padding:22px 26px 18px;
+  background:rgba(255,255,255,.92);
+}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.modal-head h2{font-size:19px;font-weight:800;letter-spacing:1px}
+.modal-head h2 .suiticon{color:var(--blue)}
+.modal-head h2 .suiticon.red{color:#ef4444}
+.btn-close{
+  width:34px;height:34px;border-radius:10px;border:1px solid var(--line);
+  background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);
+  transition:all .15s ease;
+}
+.btn-close:hover{background:#f2f6fd;color:var(--danger);transform:rotate(90deg)}
+.hand-list{margin-top:8px}
+.hand-row{
+  display:flex;align-items:center;gap:13px;padding:10px 4px;
+  border-bottom:1px dashed var(--line);
+}
+.hand-row:last-child{border-bottom:none}
+.hand-rank{
+  width:30px;height:30px;border-radius:10px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:13px;color:var(--blue-deep);background:var(--blue-soft);
+}
+.hand-name{width:158px;flex-shrink:0}
+.hand-name .cn{font-size:15px;font-weight:700}
+.hand-name .en{font-size:10.5px;color:#8aa2c4;letter-spacing:.5px;margin-top:1px}
+.hand-cards{flex:1;font-size:16px;font-weight:700;letter-spacing:2px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hand-rule{width:180px;flex-shrink:0;font-size:11.5px;color:var(--ink-soft);line-height:1.5;text-align:right}
+.red{color:#e0353b}
+.hand-rules{
+  margin-top:12px;padding:12px 16px;border-radius:14px;
+  background:var(--blue-soft);font-size:12.5px;color:var(--ink);line-height:1.9;
+}
+.hand-rules b{color:var(--blue-deep)}
+.hand-rules .red{font-weight:700}
+
+/* ============ 窄屏适配 ============ */
+@media (max-width:760px){
+  .layout{flex-direction:column}
+  main.center{order:1;min-height:auto}
+  aside#stageList{order:2;width:100%;flex-direction:row;flex-wrap:wrap}
+  .aside-title{width:100%}
+  .stg{flex:1 1 44%}
+  .blind{min-width:0;flex:1}
+  .hand-row{flex-wrap:wrap;gap:8px}
+  .hand-rule{width:100%;text-align:left}
+  .hand-name{width:140px}
+}
+</style>
+</head>
+<body>
+<div class="bg-suits" aria-hidden="true"><span>&#9824;</span><span>&#9829;</span><span>&#9830;</span><span>&#9827;</span></div>
+
+<!-- ============ 主界面 ============ -->
+<section id="viewMain" class="view">
+  <header class="topbar">
+    <div class="brand"><span class="suiticon">&#9824;</span><span class="suiticon red">&#9829;</span> 德州扑克 · 盲注计时器</div>
+    <div class="topbar-right">
+      <button class="btn hands" id="btnHands"></button>
+      <div class="phase-badge">第 <b id="badgeNow">1</b> 阶段 / 共 8 阶段</div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside id="stageList" class="glass" aria-label="阶段盲注列表">
+      <div class="aside-title">阶 段 之 路</div>
+    </aside>
+
+    <main class="center glass">
+      <div class="pill-row">
+        <div class="stage-pill" id="stagePill"></div>
+        <div class="paused-pill hidden" id="pausedPill"></div>
+      </div>
+      <div class="clock" id="clock">20:00</div>
+      <div class="blinds" id="blindBox">
+        <div class="blind sb"><span class="blabel">小盲 SMALL BLIND</span><span class="bval" id="sbVal">10</span></div>
+        <div class="blind bb"><span class="blabel">大盲 BIG BLIND</span><span class="bval" id="bbVal">20</span></div>
+      </div>
+      <div class="progress"><i id="progFill"></i></div>
+      <div class="controls">
+        <button class="btn primary" id="btnPause"></button>
+        <button class="btn" id="btnPrev"></button>
+        <button class="btn" id="btnNext"></button>
+        <button class="btn" id="btnSound"></button>
+        <button class="btn danger" id="btnReset"></button>
+      </div>
+    </main>
+  </div>
+  <footer class="note">阶段时长：第1-2阶段 20 分钟 · 第3-4阶段 15 分钟 · 第5-8阶段 12 分钟 · 每秒自动保存，关闭页面后可断点续算</footer>
+</section>
+
+<!-- ============ 牌型大小弹窗 ============ -->
+<div class="modal-mask hidden" id="handModal">
+  <div class="modal glass">
+    <div class="modal-head">
+      <h2><span class="suiticon">&#9824;</span><span class="suiticon red">&#9829;</span> 牌型大小 · 从大到小</h2>
+      <button class="btn-close" id="btnCloseModal" aria-label="关闭"></button>
+    </div>
+    <div class="hand-list" id="handList"></div>
+    <div class="hand-rules" id="handRules"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ===================== 常量与状态 ===================== */
+const BLINDS    = [10, 20, 50, 100, 200, 500, 1000, 2000];            // 各阶段小盲注
+const NAMES     = ['初出茅庐','崭露头角','独当一面','出类拔萃','人中龙凤','出神入化','登峰造极','天下无双'];
+const DURATIONS = [20, 20, 15, 15, 12, 12, 12, 12];                    // 各阶段时长（分钟）
+const TOTAL  = BLINDS.length;
+const KEY    = 'texas-blinds-timer-v2';
+
+const $ = id => document.getElementById(id);
+const phaseMs = idx => DURATIONS[idx]*60000;
+
+let S = null;
+let lastSaveSec = -1;
+
+/* ===================== 内联 SVG 图标 ===================== */
+const A = (inner) => '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+const ICONS = {
+  play : A('<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none"/>'),
+  pause: A('<rect x="5" y="4" width="4.6" height="16" rx="1.4" fill="currentColor" stroke="none"/><rect x="14.4" y="4" width="4.6" height="16" rx="1.4" fill="currentColor" stroke="none"/>'),
+  prev : A('<polygon points="19 20 9 12 19 4 19 20" fill="currentColor" stroke="none"/><line x1="5" y1="5" x2="5" y2="19"/>'),
+  next : A('<polygon points="5 4 15 12 5 20 5 4" fill="currentColor" stroke="none"/><line x1="19" y1="5" x2="19" y2="19"/>'),
+  volOn : A('<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>'),
+  volOff: A('<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/>'),
+  reset : A('<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>'),
+  check : A('<polyline points="20 6 9 17 4 12"/>'),
+  flag  : A('<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>'),
+  timer : A('<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/>'),
+  crown : A('<path d="M2 18h20"/><path d="M3 6l4 5 5-7 5 7 4-5v9H3z"/>'),
+  list  : A('<line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>'),
+  close : A('<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>')
+};
+
+/* ===================== 状态存取 ===================== */
+function freshState(){
+  return { phaseIndex: 0, remainingMs: phaseMs(0),
+           paused: true, started: false, finished: false, sound: true, savedAt: Date.now() };
+}
+function save(){
+  if(!S) return;
+  if(!S.paused && !S.finished){
+    /* 运行中保存：先把已流逝时间结算进剩余，再重置基准，避免反复保存导致时钟停摆 */
+    S.remainingMs = Math.max(0, S.remainingMs - (Date.now() - S.savedAt));
+  }
+  S.savedAt = Date.now();
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(!raw) return null;
+    const s = JSON.parse(raw);
+    if(!s || typeof s.phaseIndex !== 'number' || typeof s.started !== 'boolean') return null;
+    if(s.phaseIndex < 0 || s.phaseIndex >= TOTAL) return null;
+    if(!s.paused && !s.finished){
+      /* 页面关闭期间计时照走：把流逝时间折算到阶段推进 */
+      let r = s.remainingMs - (Date.now() - s.savedAt);
+      while(r <= 0){
+        if(s.phaseIndex >= TOTAL-1){ s.finished = true; s.paused = true; r = 0; break; }
+        s.phaseIndex++; r += phaseMs(s.phaseIndex);
+      }
+      s.remainingMs = r; s.savedAt = Date.now();
+    }
+    return s;
+  }catch(e){ return null; }
+}
+
+/* ===================== 提示音 ===================== */
+let AC = null;
+function ensureAC(){
+  try{
+    if(!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if(AC && AC.state === 'suspended') AC.resume().catch(function(){});
+  }catch(e){}
+}
+function beep(freq, t0, dur, vol){
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sine'; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(AC.destination);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+function playChime(kind){
+  if(!S || !S.sound) return;
+  ensureAC(); if(!AC) return;
+  const t = AC.currentTime + 0.02;
+  if(kind === 'end'){
+    beep(880, t, .55, .20); beep(1108.73, t+.22, .55, .20); beep(1318.51, t+.44, .9, .20);
+  }else{
+    beep(880, t, .3, .20); beep(1174.66, t+.16, .38, .20);
+  }
+}
+
+/* ===================== Toast ===================== */
+let toastTimer = null;
+function showToast(html){
+  const el = $('toast');
+  el.innerHTML = html; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.classList.remove('show'), 2600);
+}
+
+/* ===================== 核心动作 ===================== */
+function actualRemaining(){
+  if(S.paused || S.finished) return S.remainingMs;
+  return S.remainingMs - (Date.now() - S.savedAt);
+}
+function advance(auto){
+  if(S.phaseIndex >= TOTAL-1){
+    S.finished = true; S.paused = true; S.remainingMs = 0;
+    save(); render();
+    if(auto) playChime('end');
+    return;
+  }
+  S.phaseIndex++;
+  S.remainingMs = phaseMs(S.phaseIndex);
+  save();
+  if(auto){
+    playChime('phase');
+    showToast(ICONS.crown + ' 第 ' + (S.phaseIndex+1) + ' 阶段 · ' + NAMES[S.phaseIndex]
+            + ' · 小盲 ' + BLINDS[S.phaseIndex] + ' / 大盲 ' + BLINDS[S.phaseIndex]*2);
+  }
+  render();
+}
+function prevPhase(){
+  if(S.phaseIndex > 0){
+    S.phaseIndex--;
+    S.remainingMs = phaseMs(S.phaseIndex);
+    save(); render();
+  }
+}
+function togglePause(){
+  if(S.finished) return;
+  if(S.paused){ S.paused = false; S.started = true; S.savedAt = Date.now(); }
+  else{ S.remainingMs = Math.max(0, actualRemaining()); S.paused = true; }
+  save(); render();
+}
+function toggleSound(){ S.sound = !S.sound; save(); render(); }
+function resetGame(){
+  if(!confirm('确定要重新开局吗？\n\n当前进度与阶段将全部重置，回到第 1 阶段待开始状态。')) return;
+  S = freshState();
+  lastSaveSec = -1;
+  save(); render();
+}
+
+/* ===================== 牌型数据 ===================== */
+const RD = 'red';
+const HANDS = [
+  {cn:'皇家同花顺', en:'Royal Flush',     ex:'<span>&#9824;10 &#9824;J &#9824;Q &#9824;K &#9824;A</span>', rule:'同花色 10-J-Q-K-A，牌型之王'},
+  {cn:'同花顺',     en:'Straight Flush',  ex:'<span class="'+RD+'">&#9829;5 &#9829;6 &#9829;7 &#9829;8 &#9829;9</span>', rule:'同花色连续5张 · 比最大一张'},
+  {cn:'四条',       en:'Four of a Kind',  ex:'9<span class="'+RD+'">&#9830;</span> 9<span>&#9827;</span> 9<span class="'+RD+'">&#9829;</span> 9<span>&#9824;</span> + K', rule:'4张同点数 · 比四条点数'},
+  {cn:'葫芦',       en:'Full House',      ex:'Q<span>&#9824;</span> Q<span class="'+RD+'">&#9829;</span> Q<span class="'+RD+'">&#9830;</span> 8<span>&#9827;</span> 8<span>&#9827;</span>', rule:'三条+对子 · 先比三条再比对子'},
+  {cn:'同花',       en:'Flush',           ex:'<span>&#9827;A &#9827;9 &#9827;6 &#9827;4 &#9827;2</span>', rule:'同花色5张不连续 · 逐张从大到小比'},
+  {cn:'顺子',       en:'Straight',        ex:'8<span class="'+RD+'">&#9830;</span> 7<span class="'+RD+'">&#9829;</span> 6<span>&#9824;</span> 5<span>&#9827;</span> 4<span class="'+RD+'">&#9830;</span>', rule:'连续5张不分花色 · A可作最大或最小'},
+  {cn:'三条',       en:'Three of a Kind', ex:'7<span>&#9824;</span> 7<span class="'+RD+'">&#9829;</span> 7<span class="'+RD+'">&#9830;</span> + A K', rule:'3张同点数 · 先比三条再比散牌'},
+  {cn:'两对',       en:'Two Pair',        ex:'K<span>&#9824;</span> K<span class="'+RD+'">&#9829;</span> 5<span class="'+RD+'">&#9830;</span> 5<span>&#9827;</span> + 9', rule:'先比大对 → 小对 → 单张'},
+  {cn:'一对',       en:'One Pair',        ex:'8<span>&#9824;</span> 8<span class="'+RD+'">&#9829;</span> + A K 5', rule:'先比对子点数，再逐张比散牌'},
+  {cn:'高牌',       en:'High Card',       ex:'A<span>&#9824;</span> J<span class="'+RD+'">&#9829;</span> 8<span class="'+RD+'">&#9830;</span> 4<span>&#9827;</span> 3<span>&#9824;</span>', rule:'以上皆无 · 逐张从大到小比'}
+];
+function buildHands(){
+  const box = $('handList');
+  box.innerHTML = HANDS.map((h, i) =>
+    '<div class="hand-row">'
+    + '<span class="hand-rank">' + (i+1) + '</span>'
+    + '<span class="hand-name"><span class="cn">' + h.cn + '</span><span class="en">' + h.en + '</span></span>'
+    + '<span class="hand-cards">' + h.ex + '</span>'
+    + '<span class="hand-rule">' + h.rule + '</span>'
+    + '</div>'
+  ).join('');
+  $('handRules').innerHTML =
+    '<b>核心规则：</b>'
+    + '① 花色不分大小——<span>&#9824;</span><span class="red">&#9829;</span><span class="red">&#9830;</span><span>&#9827;</span> 完全等价；'
+    + '② 终局 7 张牌（2 底牌 + 5 公共牌）中选最优 5 张，两人 5 张等值即<b>平分底池</b>，不能用第 6 张比大小；'
+    + '③ A 是双面牌：顺子中 <b>10-J-Q-K-A</b> 最大、<b>A-2-3-4-5</b> 最小。';
+}
+
+/* ===================== 渲染 ===================== */
+function fmt(ms){
+  const sec = Math.max(0, Math.ceil(ms/1000));
+  const m = Math.floor(sec/60), s = sec%60;
+  return (m<10?'0':'')+m + ':' + (s<10?'0':'')+s;
+}
+function buildStageList(){
+  const box = $('stageList');
+  box.querySelectorAll('.stg').forEach(n=>n.remove());
+  for(let i=0;i<TOTAL;i++){
+    const d = document.createElement('div');
+    d.className = 'stg';
+    d.innerHTML = '<span class="no"></span>'
+                + '<span class="namebox">'
+                +   '<span class="t1"><span class="ph">第' + (i+1) + '阶段</span> ' + NAMES[i] + '</span>'
+                +   '<span class="t2">盲 ' + BLINDS[i] + ' / ' + BLINDS[i]*2 + ' · ' + DURATIONS[i] + ' 分钟</span>'
+                + '</span>';
+    box.appendChild(d);
+  }
+}
+function render(){
+  if(!S) S = freshState();
+  const idx = S.phaseIndex, totalMs = phaseMs(idx);
+  const rem = actualRemaining();
+
+  /* 顶部徽章 */
+  $('badgeNow').textContent = S.finished ? TOTAL : idx+1;
+
+  /* 中央 */
+  const clock = $('clock'), pill = $('stagePill'), pausedPill = $('pausedPill');
+  clock.className = 'clock';
+  if(S.finished){
+    clock.classList.add('finished');
+    clock.textContent = '比赛结束';
+    pill.innerHTML = ICONS.crown + ' 天下无双 · 全程 8 阶段完成';
+  }else{
+    clock.textContent = fmt(rem);
+    pill.innerHTML = ICONS.timer + ' 第 ' + (idx+1) + ' 阶段 · ' + NAMES[idx];
+    if(S.paused) clock.classList.add('paused');
+    else if(rem <= 10000) clock.classList.add('danger');
+    else if(rem <= 60000) clock.classList.add('warn');
+  }
+  const showPausePill = S.paused && !S.finished;
+  pausedPill.classList.toggle('hidden', !showPausePill);
+  pausedPill.innerHTML = ICONS.pause + (S.started ? ' 已暂停' : ' 待开始');
+
+  /* 盲注 */
+  $('sbVal').textContent = BLINDS[idx];
+  $('bbVal').textContent = BLINDS[idx]*2;
+  $('blindBox').classList.toggle('dim', S.finished);
+
+  /* 进度条 */
+  const fill = $('progFill');
+  const pct = S.finished ? 100 : Math.min(100, Math.max(0, (1 - rem/totalMs)*100));
+  fill.style.width = pct + '%';
+  fill.className = (!S.finished && rem <= 10000) ? 'danger' : (!S.finished && rem <= 60000) ? 'warn' : '';
+
+  /* 按钮 */
+  $('btnPause').disabled = S.finished;
+  $('btnPause').innerHTML = (S.paused && !S.started && !S.finished) ? ICONS.play + '<span>开 始</span>'
+                        : (S.paused ? ICONS.play + '<span>继 续</span>' : ICONS.pause + '<span>暂 停</span>');
+  $('btnPrev').disabled = S.finished || idx === 0;
+  $('btnPrev').innerHTML = ICONS.prev + '<span>上一阶段</span>';
+  $('btnNext').disabled = S.finished || idx === TOTAL-1;
+  $('btnNext').innerHTML = ICONS.next + '<span>下一阶段</span>';
+  $('btnSound').innerHTML = (S.sound ? ICONS.volOn : ICONS.volOff) + '<span>声音 ' + (S.sound ? '开' : '关') + '</span>';
+  $('btnReset').innerHTML = ICONS.reset + '<span>重新开局</span>';
+  $('btnHands').innerHTML = ICONS.list + '<span>牌型大小</span>';
+  $('btnCloseModal').innerHTML = ICONS.close;
+
+  /* 阶段列表 */
+  const rows = document.querySelectorAll('#stageList .stg');
+  rows.forEach((row, i)=>{
+    row.classList.toggle('done', i < idx || S.finished);
+    row.classList.toggle('cur', i === idx && !S.finished);
+    const no = row.querySelector('.no');
+    if(row.classList.contains('done')) no.innerHTML = ICONS.check;
+    else no.textContent = i+1;
+    let tag = row.querySelector('.tag');
+    if(i === idx && !S.finished){
+      if(!tag){ tag = document.createElement('span'); tag.className = 'tag'; row.appendChild(tag); }
+      tag.textContent = !S.started ? '待开始' : (S.paused ? '已暂停' : '进行中');
+    }else if(tag){ tag.remove(); }
+  });
+}
+
+/* ===================== 弹窗控制 ===================== */
+function openModal(){ $('handModal').classList.remove('hidden'); }
+function closeModal(){ $('handModal').classList.add('hidden'); }
+
+/* ===================== 主循环 ===================== */
+setInterval(function(){
+  if(!S || S.finished){ return; }
+  if(!S.paused){
+    const rem = S.remainingMs - (Date.now() - S.savedAt);
+    if(rem <= 0){ advance(true); return; }
+    const sec = Math.ceil(rem/1000);
+    if(sec !== lastSaveSec){ lastSaveSec = sec; save(); }   // 每秒自动保存
+  }
+  render();
+}, 200);
+
+/* ===================== 事件绑定 ===================== */
+$('btnPause').addEventListener('click', togglePause);
+$('btnPrev').addEventListener('click', prevPhase);
+$('btnNext').addEventListener('click', ()=>advance(false));
+$('btnSound').addEventListener('click', toggleSound);
+$('btnReset').addEventListener('click', resetGame);
+$('btnHands').addEventListener('click', openModal);
+$('btnCloseModal').addEventListener('click', closeModal);
+$('handModal').addEventListener('click', e=>{ if(e.target === $('handModal')) closeModal(); });
+document.addEventListener('keydown', e=>{
+  if(e.code === 'Escape'){ closeModal(); return; }
+  if(!$('handModal').classList.contains('hidden')) return;   // 弹窗打开时不响应快捷键
+  if(!S || S.finished) return;
+  if(e.code === 'Space'){ e.preventDefault(); togglePause(); }
+  if(e.code === 'ArrowRight') advance(false);
+  if(e.code === 'ArrowLeft') prevPhase();
+});
+window.addEventListener('pagehide', save);
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) save(); });
+
+/* ===================== 启动 ===================== */
+buildStageList();
+buildHands();
+S = loadState() || freshState();
+render();
+
+/* PWA 离线缓存：仅安全上下文（https/localhost）注册，file:// 打开时自动跳过 */
+if('serviceWorker' in navigator && window.isSecureContext){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+</script>
+</body>
+</html>

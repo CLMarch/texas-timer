@@ -1,0 +1,14 @@
+{
+  "name": "德州扑克盲注计时器",
+  "short_name": "德州计时器",
+  "description": "8阶段盲注计时器：初出茅庐到天下无双",
+  "start_url": "./德州盲注计时器.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f7fbff",
+  "theme_color": "#2f7bf6",
+  "icons": [
+    { "src": "touch-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
